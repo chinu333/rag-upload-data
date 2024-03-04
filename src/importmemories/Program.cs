@@ -98,31 +98,100 @@ internal class Program
         {
             Console.WriteLine($"Importing [{++fileCount}/{fileInfo.Length}] {fileInfo.FullName}");
 
-            // Read the text file.
-            string text = File.ReadAllText(fileInfo.FullName);
-
-            // Split the text into sentences.
-            string[] sentences = BlingFireUtils.GetSentences(text).ToArray();
-
-            // Save each sentence to the memory store.
-            int sentenceCount = 0;
-            foreach (string sentence in sentences)
+            if(fileInfo.Extension == ".txt")
             {
-                ++sentenceCount;
-                if (sentenceCount % 10 == 0)
-                {
-                    // Log progress every 10 sentences.
-                    Console.WriteLine($"[{fileCount}/{fileInfo.Length}] {fileInfo.FullName}: {sentenceCount}/{sentences.Length}");
-                }
+                Console.WriteLine("Importing text file.");
+                // Read the text file.
+                string text = File.ReadAllText(fileInfo.FullName);
 
-                await kernel.Memory.SaveInformationAsync(
-                    collection: collection,
-                    text: sentence,
-                    id: memoryId++.ToString(),
-                    description: sentence);
+                // Split the text into sentences.
+                string[] sentences = BlingFireUtils.GetSentences(text).ToArray();
+
+                // Save each sentence to the memory store.
+                int sentenceCount = 0;
+                foreach (string sentence in sentences)
+                {
+                    ++sentenceCount;
+                    if (sentenceCount % 10 == 0)
+                    {
+                        // Log progress every 10 sentences.
+                        Console.WriteLine($"[{fileCount}/{fileInfo.Length}] {fileInfo.FullName}: {sentenceCount}/{sentences.Length}");
+                    }
+
+                    await kernel.Memory.SaveInformationAsync(
+                        collection: collection,
+                        text: sentence,
+                        id: memoryId++.ToString(),
+                        description: sentence);
+                }
+            }
+            else if(fileInfo.Extension == ".pdf")
+            {
+                await ImportFromPDFAsync(kernel, collection, fileInfo, memoryId);
+            }
+            else if(fileInfo.Extension == ".csv")
+            {
+                await ImportFromCSVAsync(kernel, collection, fileInfo, memoryId);
             }
         }
 
         Console.WriteLine("Done!");
+    }
+
+    static async Task ImportFromPDFAsync(IKernel kernel, string collection, FileInfo fileInfo, int memoryId)
+    {
+        Console.WriteLine("Importing pdf file.");
+
+        //set `<your-endpoint>` and `<your-key>` variables with the values from the Azure portal to create your `AzureKeyCredential` and `DocumentIntelligenceClient` instance
+        string endpoint = "https://mtcdocintel.cognitiveservices.azure.com/";
+        string key = "7b073a748ede47e1acb97ac9f4928416";
+        AzureKeyCredential credential = new AzureKeyCredential(key);
+        // DocumentIntelligenceClient client = new DocumentIntelligenceClient(new Uri(endpoint), credential);
+        DocumentAnalysisClient client = new DocumentAnalysisClient(new Uri(endpoint), credential);
+
+        //sample document
+        System.IO.Stream fileStream = File.OpenRead(fileInfo.FullName);
+
+        AnalyzeDocumentOperation operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-layout", fileStream);
+        AnalyzeResult result = operation.Value;
+
+        foreach (DocumentPage page in result.Pages)
+        {
+            Console.WriteLine($"Document Page {page.PageNumber} has {page.Lines.Count} line(s), {page.Words.Count} word(s),");
+
+            // foreach (DocumentParagraph paragraph in result.Paragraphs)
+            // {
+            //     Console.WriteLine($"  Paragraph content: {paragraph.Content}");
+            // }
+
+            for (int i = 0; i < page.Lines.Count; i++)
+            {
+                DocumentLine line = page.Lines[i];
+                // Console.WriteLine($"  Line {i} has content: '{line.Content}'.");
+                await kernel.Memory.SaveInformationAsync(
+                        collection: collection,
+                        text: line.Content,
+                        id: memoryId++.ToString(),
+                        description: line.Content);
+            }
+        }
+    }
+
+    static async Task ImportFromCSVAsync(IKernel kernel, string collection, FileInfo fileInfo, int memoryId)
+    {
+        Console.WriteLine("Importing csv file.");
+
+        var reader = new StreamReader(@fileInfo.FullName);
+
+        while (!reader.EndOfStream)
+        {
+            var line = reader.ReadLine();
+            Console.WriteLine("CSV line: " + line);
+            await kernel.Memory.SaveInformationAsync(
+                        collection: collection,
+                        text: line ?? "",
+                        id: memoryId++.ToString(),
+                        description: line);
+        }
     }
 }
