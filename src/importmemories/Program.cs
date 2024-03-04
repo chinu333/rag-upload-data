@@ -143,8 +143,8 @@ internal class Program
         Console.WriteLine("Importing pdf file.");
 
         //set `<your-endpoint>` and `<your-key>` variables with the values from the Azure portal to create your `AzureKeyCredential` and `DocumentIntelligenceClient` instance
-        string endpoint = "https://mtcdocintel.cognitiveservices.azure.com/";
-        string key = "7b073a748ede47e1acb97ac9f4928416";
+        string endpoint = "";
+        string key = "";
         AzureKeyCredential credential = new AzureKeyCredential(key);
         // DocumentIntelligenceClient client = new DocumentIntelligenceClient(new Uri(endpoint), credential);
         DocumentAnalysisClient client = new DocumentAnalysisClient(new Uri(endpoint), credential);
